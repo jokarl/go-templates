@@ -7,8 +7,9 @@ import (
 )
 
 type Router struct {
-	Mux    *http.ServeMux
-	logger logger.Logger
+	Mux        *http.ServeMux
+	logger     logger.Logger
+	middleware []Middleware
 }
 
 func New(opts ...func(router *Router)) *Router {

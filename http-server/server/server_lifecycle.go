@@ -11,6 +11,8 @@ import (
 
 // Start the server.
 func (s Server) Start() error {
+	ctx, stop := signal.NotifyContext(s.ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 
 	go func() {
 		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -18,38 +20,29 @@ func (s Server) Start() error {
 		}
 	}()
 
-	go func() {
-		s.stop()
-	}()
+	s.logger.InfoContext(s.ctx, "Server started.", "address", s.httpServer.Addr)
 
-	s.logger.Info("Server started.", "address", s.httpServer.Addr)
+	select {
+	case err := <-s.errCh:
+		close(s.errCh)
+		return err
+	case <-ctx.Done():
+		s.logger.InfoContext(ctx, "Initiating server shutdown.", "reason", ctx.Err())
 
-	for {
-		select {
-		case err := <-s.errCh:
-			close(s.errCh)
-			return err
-		case sig := <-s.stopCh:
-			s.logger.Info("Server stopped.", "reason", sig.String())
-			close(s.stopCh)
-			return nil
+		shutdownTimeout := s.shutdownTimeout
+		if shutdownTimeout == 0 {
+			shutdownTimeout = s.httpServer.ReadTimeout
 		}
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+
+		s.httpServer.SetKeepAlivesEnabled(false)
+		if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
+			s.logger.ErrorContext(shutdownCtx, "Server shutdown error.", "error", err)
+			return err
+		}
+
+		s.logger.Info("Server shutdown completed successfully.")
+		return nil
 	}
-}
-
-// stop the server gracefully on receiving a termination signal.
-func (s Server) stop() {
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	sig := <-stop
-
-	ctx, cancel := context.WithTimeout(context.Background(), s.httpServer.ReadTimeout)
-	defer cancel()
-
-	s.httpServer.SetKeepAlivesEnabled(false)
-	if err := s.httpServer.Shutdown(ctx); err != nil {
-		s.errCh <- err
-	}
-
-	s.stopCh <- sig
 }

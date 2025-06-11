@@ -2,7 +2,6 @@ package server
 
 import (
 	"github.com/jokarl/go-templates/http-server/logger"
-	"github.com/jokarl/go-templates/http-server/router"
 	"time"
 )
 
@@ -23,22 +22,24 @@ func WithAddr(addr string) Option {
 	}
 }
 
-// WithReadTimeout sets the read timeout
+// WithReadTimeout sets the read timeout.
 func WithReadTimeout(timeout time.Duration) Option {
 	return func(s *Server) {
 		s.httpServer.ReadTimeout = timeout
 	}
 }
 
-// WithWriteTimeout sets the write timeout
-func WithWriteTimeout(timeout time.Duration) Option {
+// WithShutdownTimeout sets the timeout for graceful shutdown.
+// If not set, defaults to WithReadTimeout.
+func WithShutdownTimeout(timeout time.Duration) Option {
 	return func(s *Server) {
-		s.httpServer.WriteTimeout = timeout
+		s.shutdownTimeout = timeout
 	}
 }
 
-func WithRouter(router *router.Router) Option {
+// WithWriteTimeout sets the write timeout.
+func WithWriteTimeout(timeout time.Duration) Option {
 	return func(s *Server) {
-		s.httpServer.Handler = router.Mux
+		s.httpServer.WriteTimeout = timeout
 	}
 }
