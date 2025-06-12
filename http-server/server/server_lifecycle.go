@@ -4,14 +4,10 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 // Start the server.
-func (s Server) Start() error {
-	ctx, stop := signal.NotifyContext(s.ctx, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+func (s Server) Start(ctx context.Context, stop context.CancelFunc) error {
 	defer stop()
 
 	go func() {
@@ -20,7 +16,7 @@ func (s Server) Start() error {
 		}
 	}()
 
-	s.logger.InfoContext(s.ctx, "Server started.", "address", s.httpServer.Addr)
+	s.logger.InfoContext(ctx, "Server started.", "address", s.httpServer.Addr)
 
 	select {
 	case err := <-s.errCh:

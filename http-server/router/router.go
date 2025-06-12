@@ -6,32 +6,62 @@ import (
 	"net/http"
 )
 
+// Router represents an HTTP router that manages routes and middlewares.
 type Router struct {
-	Mux        *http.ServeMux
-	logger     logger.Logger
-	middleware []Middleware
+	mux         *http.ServeMux
+	logger      logger.Logger
+	middlewares []Middleware
 }
 
-func New(opts ...func(router *Router)) *Router {
-	r := &Router{
-		Mux:    http.NewServeMux(),
-		logger: logger.New(slog.LevelInfo),
+// New creates a new Router instance with the provided middlewares and options.
+// The first middleware is always a logging middleware that logs requests and responses.
+func New(routes []Route, mw []Middleware, opts ...func(router *Router)) *Router {
+	rt := &Router{
+		mux:         http.NewServeMux(),
+		logger:      logger.New(slog.LevelInfo),
+		middlewares: mw,
 	}
 
-	// Apply all options
 	for _, opt := range opts {
-		opt(r)
+		opt(rt)
 	}
 
-	return r
+	rt.middlewares = append([]Middleware{loggingMiddleware(rt.logger)}, rt.middlewares...)
+	rt.registerRoutes(routes)
+
+	return rt
 }
 
+func (rt *Router) registerRoutes(routes []Route) {
+	for _, route := range routes {
+		h := route.Handler
+
+		for i := len(rt.middlewares) - 1; i >= 0; i-- {
+			if rt.middlewares[i] != nil {
+				h = rt.middlewares[i](h)
+			}
+		}
+
+		rt.mux.Handle(string(route.Method)+" "+route.Path, h)
+		rt.logger.Info("Route registered.",
+			"method", route.Method,
+			"path", route.Path)
+	}
+}
+
+// ServeHTTP makes the Router an http.Handler.
+func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	rt.mux.ServeHTTP(w, r)
+}
+
+// Route defines a single HTTP route.
 type Route struct {
 	Method  Method
 	Path    string
 	Handler http.Handler
 }
 
+// Method represents an HTTP method.
 type Method string
 
 const (

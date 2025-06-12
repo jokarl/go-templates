@@ -18,7 +18,6 @@ type Server struct {
 	stopCh          chan os.Signal
 	errCh           chan error
 	shutdownTimeout time.Duration
-	ctx             context.Context
 }
 
 const (
@@ -28,15 +27,13 @@ const (
 )
 
 // New creates a new server with the given options.
-// The context is used for the BaseContext of http.Server
-// and for graceful shutdown handling.
 func New(ctx context.Context, router *router.Router, opts ...func(*Server)) *Server {
 	s := &Server{
 		httpServer: &http.Server{
 			Addr:         defaultAddr,
 			ReadTimeout:  defaultReadTimeout,
 			WriteTimeout: defaultWriteTimeout,
-			Handler:      router.Mux,
+			Handler:      router,
 			BaseContext: func(listener net.Listener) context.Context {
 				return context.WithValue(ctx, "listener", listener)
 			},
@@ -44,7 +41,6 @@ func New(ctx context.Context, router *router.Router, opts ...func(*Server)) *Ser
 		logger: logger.New(slog.LevelInfo),
 		stopCh: make(chan os.Signal),
 		errCh:  make(chan error),
-		ctx:    ctx,
 	}
 
 	// Apply all options
