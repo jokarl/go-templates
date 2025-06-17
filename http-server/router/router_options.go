@@ -1,11 +1,13 @@
 package router
 
-import "github.com/jokarl/go-templates/http-server/logger"
+import (
+	"log/slog"
+)
 
 type Option func(router *Router)
 
 // WithLogger sets the logger for the router.
-func WithLogger(logger logger.Logger) Option {
+func WithLogger(logger *slog.Logger) Option {
 	return func(router *Router) {
 		router.logger = logger
 	}

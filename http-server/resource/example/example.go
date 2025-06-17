@@ -1,19 +1,20 @@
 package example
 
 import (
-	"github.com/jokarl/go-templates/http-server/logger"
 	"github.com/jokarl/go-templates/http-server/router"
+	"log/slog"
 	"net/http"
 	"path"
+	"time"
 )
 
-// ExampleResource is a concrete type that implements the Resource interface.
+// ExampleResource is a concrete type that implements the resource.Resource interface.
 type ExampleResource struct {
-	logger logger.Logger
+	logger *slog.Logger
 }
 
 // NewExampleResource creates a new instance of ExampleResource with the provided logger.
-func NewExampleResource(l logger.Logger) *ExampleResource {
+func NewExampleResource(l *slog.Logger) *ExampleResource {
 	return &ExampleResource{
 		logger: l,
 	}
@@ -31,6 +32,17 @@ func (er *ExampleResource) Routes() []router.Route {
 			_, err := w.Write([]byte("Hello, World!"))
 			if err != nil {
 				er.logger.ErrorContext(r.Context(), "Failed to write response", "error", err)
+			}
+		}),
+	}, {
+		Method: router.MethodGet,
+		Path:   path.Join(er.RootPath(), "/long"),
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			select {
+			case <-time.After(2 * time.Second):
+				w.Write([]byte("Hello, World!"))
+			case <-r.Context().Done():
+				http.Error(w, "Request cancelled.", http.StatusRequestTimeout)
 			}
 		}),
 	}}

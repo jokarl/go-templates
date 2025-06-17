@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/jokarl/go-templates/http-server/logger"
 	"github.com/jokarl/go-templates/http-server/resource/example"
 	"github.com/jokarl/go-templates/http-server/router"
 	"github.com/jokarl/go-templates/http-server/server"
@@ -13,15 +12,17 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
-
-	sCtx, stop := signal.NotifyContext(
-		ctx, os.Interrupt,
+	// Root context listens for OS signals to gracefully shut down the server.
+	rootCtx, stop := signal.NotifyContext(
+		context.Background(), os.Interrupt,
 		syscall.SIGINT,
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
+	defer stop()
 
-	l := logger.New(slog.LevelInfo)
+	l := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
 
 	er := example.NewExampleResource(l)
 
@@ -31,17 +32,11 @@ func main() {
 		router.WithLogger(l),
 	)
 
-	srv := server.New(
-		sCtx,
-		rt,
-		server.WithLogger(l),
-		server.WithAddr(":8080"),
-	)
+	srv := server.New(rt, server.WithLogger(l), server.WithAddr(":8080"))
 
-	if err := srv.Start(sCtx, stop); err != nil {
-		l.Error("Server error.", "error", err)
-	}
+	srv.Start()
 
-	defer os.Exit(0)
-	return
+	<-rootCtx.Done()
+	stop()
+	srv.GracefulShutdown()
 }

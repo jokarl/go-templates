@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/jokarl/go-templates/http-server/logger"
+	"log/slog"
 	"time"
 )
 
@@ -9,7 +9,7 @@ import (
 type Option func(*Server)
 
 // WithLogger sets the logger to use for the server
-func WithLogger(logger logger.Logger) Option {
+func WithLogger(logger *slog.Logger) Option {
 	return func(s *Server) {
 		s.logger = logger
 	}

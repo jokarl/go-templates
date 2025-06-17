@@ -7,17 +7,15 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"time"
 )
 
 // Server represents a simple HTTP server with graceful shutdown capabilities.
 type Server struct {
-	httpServer      *http.Server
-	logger          logger.Logger
-	stopCh          chan os.Signal
-	errCh           chan error
-	shutdownTimeout time.Duration
+	httpServer       *http.Server
+	logger           *slog.Logger
+	shutdownTimeout  time.Duration
+	gracefulShutdown context.CancelFunc
 }
 
 const (
@@ -27,7 +25,9 @@ const (
 )
 
 // New creates a new server with the given options.
-func New(ctx context.Context, router *router.Router, opts ...func(*Server)) *Server {
+func New(router *router.Router, opts ...func(*Server)) *Server {
+	// Ensure in-flight requests aren't cancelled immediately on SIGTERM
+	ongoingCtx, stopOngoingGracefully := context.WithCancel(context.Background())
 	s := &Server{
 		httpServer: &http.Server{
 			Addr:         defaultAddr,
@@ -35,12 +35,11 @@ func New(ctx context.Context, router *router.Router, opts ...func(*Server)) *Ser
 			WriteTimeout: defaultWriteTimeout,
 			Handler:      router,
 			BaseContext: func(listener net.Listener) context.Context {
-				return context.WithValue(ctx, "listener", listener)
+				return ongoingCtx
 			},
 		},
-		logger: logger.New(slog.LevelInfo),
-		stopCh: make(chan os.Signal),
-		errCh:  make(chan error),
+		logger:           logger.New(slog.LevelInfo),
+		gracefulShutdown: stopOngoingGracefully,
 	}
 
 	// Apply all options

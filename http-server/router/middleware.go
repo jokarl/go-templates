@@ -1,14 +1,14 @@
 package router
 
 import (
-	"github.com/jokarl/go-templates/http-server/logger"
+	"log/slog"
 	"net/http"
 	"time"
 )
 
 type Middleware func(next http.Handler) http.Handler
 
-func loggingMiddleware(logger logger.Logger) Middleware {
+func loggingMiddleware(logger *slog.Logger) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			startTime := time.Now()

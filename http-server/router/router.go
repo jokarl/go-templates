@@ -9,12 +9,17 @@ import (
 // Router represents an HTTP router that manages routes and middlewares.
 type Router struct {
 	mux         *http.ServeMux
-	logger      logger.Logger
+	logger      *slog.Logger
 	middlewares []Middleware
 }
 
 // New creates a new Router instance with the provided middlewares and options.
-// The first middleware is always a logging middleware that logs requests and responses.
+// The router includes two default middlewares: cancelMiddleware and loggingMiddleware.
+//
+// The cancelMiddleware checks if the request context is canceled or timed out,
+// and then rejects the request with a 503 Service Unavailable status if it is.
+//
+// The loggingMiddleware logs the request method, path, remote address, and duration of the request processing.
 func New(routes []Route, mw []Middleware, opts ...func(router *Router)) *Router {
 	rt := &Router{
 		mux:         http.NewServeMux(),
@@ -26,7 +31,11 @@ func New(routes []Route, mw []Middleware, opts ...func(router *Router)) *Router 
 		opt(rt)
 	}
 
-	rt.middlewares = append([]Middleware{loggingMiddleware(rt.logger)}, rt.middlewares...)
+	rt.middlewares = append([]Middleware{
+		loggingMiddleware(rt.logger),
+	},
+		rt.middlewares...)
+
 	rt.registerRoutes(routes)
 
 	return rt
