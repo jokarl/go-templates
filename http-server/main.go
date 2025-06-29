@@ -34,7 +34,9 @@ func main() {
 
 	srv := server.New(rt, server.WithLogger(l), server.WithAddr(":8080"))
 
-	srv.Start()
+	if err := srv.Start(); err != nil {
+		l.Error("Failed to start server", "error", err)
+	}
 
 	<-rootCtx.Done()
 	stop()

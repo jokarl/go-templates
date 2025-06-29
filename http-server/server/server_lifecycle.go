@@ -17,12 +17,20 @@ const (
 )
 
 // Start the server.
-func (s Server) Start() {
+func (s *Server) Start() error {
+	errCh := make(chan error, 1)
 	go func() {
 		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			panic(err)
+			errCh <- err
 		}
 	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-time.After(100 * time.Millisecond):
+		return nil
+	}
 }
 
 // GracefulShutdown initiates a graceful shutdown of the server.
@@ -30,7 +38,7 @@ func (s Server) Start() {
 // It allows _readinessDrainDelay to propagate readiness checks.
 // After that, it waits for ongoing requests to finish within _shutdownPeriod.
 // If the shutdown period expires, it waits for an additional _shutdownHardPeriod
-func (s Server) GracefulShutdown() {
+func (s *Server) GracefulShutdown() {
 	isShuttingDown.Store(true)
 	s.logger.Info("Received shutdown signal, shutting down.")
 
